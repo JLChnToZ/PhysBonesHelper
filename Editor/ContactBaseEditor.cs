@@ -46,8 +46,11 @@ class ContactBaseEditor : EditorTool
 
                 EditorGUI.BeginChangeCheck();
 
-                Vector3 position = (Vector3)(sender.transform.localToWorldMatrix * sender.position) + sender.transform.position;
-                Quaternion rotation = sender.transform.rotation * sender.rotation;
+                Transform senderTransform = sender.transform;
+                if (sender.rootTransform) senderTransform = sender.rootTransform;
+
+                Vector3 position = (Vector3)(senderTransform.localToWorldMatrix * sender.position) + senderTransform.position;
+                Quaternion rotation = senderTransform.rotation * sender.rotation;
                 Vector2 scale = new Vector2(sender.radius, sender.height);
                 position = Handles.PositionHandle(position, rotation);
                 rotation = Handles.RotationHandle(rotation, position);
@@ -58,8 +61,8 @@ class ContactBaseEditor : EditorTool
                 if (EditorGUI.EndChangeCheck())
                 {
                     Undo.RecordObject(sender, "Move Contact");
-                    sender.position = (Vector3)(sender.transform.worldToLocalMatrix * (position - sender.transform.position));
-                    sender.rotation = (Quaternion.Inverse(sender.transform.rotation) * rotation).GetNormalized();
+                    sender.position = (Vector3)(senderTransform.worldToLocalMatrix * (position - senderTransform.position));
+                    sender.rotation = (Quaternion.Inverse(senderTransform.rotation) * rotation).GetNormalized();
                     sender.radius = Mathf.Max(0.0000001f, scale.x);
                     if (sender.shapeType == ContactBase.ShapeType.Capsule)
                         sender.height = Mathf.Max(0.0000001f, scale.y);
