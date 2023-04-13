@@ -1,72 +1,51 @@
-﻿using System.Collections;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEditor;
 using UnityEditor.EditorTools;
 using UnityEngine;
 using VRC.Dynamics;
-using VRC.SDK3.Dynamics.Contact.Components;
 
 [EditorTool("PhysBones Tool", typeof(VRCPhysBoneBase))]
 class PhysEndBoneEditor : EditorTool
 {
-    // Serialize this value to set a default value in the Inspector.
     [SerializeField]
     Texture2D m_ToolIcon;
 
     GUIContent m_IconContent;
 
+    List<VRCPhysBoneBase> senders = new List<VRCPhysBoneBase>();
+
     void OnEnable()
     {
-        m_IconContent = new GUIContent()
-        {
-            image = m_ToolIcon,
-            text = "PhysBones Tool",
-            tooltip = "PhysBones Tool"
-        };
+        m_IconContent = new GUIContent("PhysBones Tool", m_ToolIcon, "PhysBones Tool");
     }
 
-    public override GUIContent toolbarIcon
-    {
-        get { return m_IconContent; }
-    }
+    public override GUIContent toolbarIcon => m_IconContent;
 
-    // This is called for each window that your tool is active in. Put the functionality of your tool here.
     public override void OnToolGUI(EditorWindow window)
     {
-        if (Selection.transforms.Length == 0) return;
-
-        for (int i = 0; i < Selection.transforms.Length; i++)
+        foreach (var transform in Selection.transforms)
         {
-
-            VRCPhysBoneBase[] senders = Selection.transforms[i].gameObject.GetComponents<VRCPhysBoneBase>();
-            for (int j = 0; j < senders.Length; j++)
+            transform.gameObject.GetComponents(senders);
+            foreach (VRCPhysBoneBase sender in senders)
             {
-                VRCPhysBoneBase sender = senders[j];
-                Transform t = sender.rootTransform != null ? GetTransformAtChild(sender.rootTransform) : GetTransformAtChild(sender.transform);
+                Transform senderTransform = sender.rootTransform;
+                if (!senderTransform) senderTransform = sender.transform;
+                while (true)
+                {
+                    if (senderTransform.childCount == 0) break;
+                    senderTransform = senderTransform.GetChild(0);
+                }
                 EditorGUI.BeginChangeCheck();
 
-                Vector4 pos4 = t.localToWorldMatrix * sender.endpointPosition;
-                Vector3 position = new Vector3(pos4.x, pos4.y, pos4.z) + t.position;
-                position = Handles.PositionHandle(position, t.rotation);
+                Vector3 position = senderTransform.TransformPoint(sender.endpointPosition);
+                position = Handles.PositionHandle(position, senderTransform.rotation);
 
                 if (EditorGUI.EndChangeCheck())
                 {
                     Undo.RecordObject(sender, "Move Contact");
-                    pos4 = t.worldToLocalMatrix * (position - t.position);
-                    sender.endpointPosition = new Vector3(pos4.x, pos4.y, pos4.z);
+                    sender.endpointPosition = senderTransform.InverseTransformPoint(position);
                 }
             }
         }
-    }
-
-    public Transform GetTransformAtChild(Transform rootTransform)
-    {
-        if(rootTransform.childCount == 0)
-        {
-            return rootTransform;
-        }
-
-        Transform t = rootTransform.GetChild(0);
-        return GetTransformAtChild(t);
     }
 }

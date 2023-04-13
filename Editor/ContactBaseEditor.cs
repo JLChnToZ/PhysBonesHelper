@@ -1,55 +1,39 @@
-﻿using System.Collections;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEditor;
 using UnityEditor.EditorTools;
 using UnityEngine;
 using VRC.Dynamics;
-using VRC.SDK3.Dynamics.Contact.Components;
 
 [EditorTool("Contact Sender Tool", typeof(ContactBase))]
 class ContactBaseEditor : EditorTool
 {
-    // Serialize this value to set a default value in the Inspector.
     [SerializeField]
     Texture2D m_ToolIcon;
 
     GUIContent m_IconContent;
 
+    List<ContactBase> senders = new List<ContactBase>();
+
     void OnEnable()
     {
-        m_IconContent = new GUIContent()
-        {
-            image = m_ToolIcon,
-            text = "Contact Tool",
-            tooltip = "Contact Tool"
-        };
+        m_IconContent = new GUIContent("Contact Tool", m_ToolIcon, "Contact Tool");
     }
 
-    public override GUIContent toolbarIcon
-    {
-        get { return m_IconContent; }
-    }
+    public override GUIContent toolbarIcon => m_IconContent;
 
-    // This is called for each window that your tool is active in. Put the functionality of your tool here.
     public override void OnToolGUI(EditorWindow window)
     {
-        if (Selection.transforms.Length == 0) return;
-
-
-        for (int i = 0; i < Selection.transforms.Length; i++)
+        foreach (var transfrom in Selection.transforms)
         {
-
-            ContactBase[] senders = Selection.transforms[i].gameObject.GetComponents<ContactBase>();
-            for (int j = 0; j < senders.Length; j++)
+            transfrom.gameObject.GetComponents(senders);
+            foreach (var sender in senders)
             {
-                ContactBase sender = senders[j];
-
                 EditorGUI.BeginChangeCheck();
 
-                Transform senderTransform = sender.transform;
-                if (sender.rootTransform) senderTransform = sender.rootTransform;
+                Transform senderTransform = sender.rootTransform;
+                if (!senderTransform) senderTransform = sender.transform;
 
-                Vector3 position = (Vector3)(senderTransform.localToWorldMatrix * sender.position) + senderTransform.position;
+                Vector3 position = senderTransform.TransformPoint(sender.position);
                 Quaternion rotation = senderTransform.rotation * sender.rotation;
                 Vector2 scale = new Vector2(sender.radius, sender.height);
                 position = Handles.PositionHandle(position, rotation);
@@ -61,8 +45,8 @@ class ContactBaseEditor : EditorTool
                 if (EditorGUI.EndChangeCheck())
                 {
                     Undo.RecordObject(sender, "Move Contact");
-                    sender.position = (Vector3)(senderTransform.worldToLocalMatrix * (position - senderTransform.position));
-                    sender.rotation = (Quaternion.Inverse(senderTransform.rotation) * rotation).GetNormalized();
+                    sender.position = senderTransform.InverseTransformPoint(position);
+                    sender.rotation = (Quaternion.Inverse(senderTransform.rotation) * rotation).normalized;
                     sender.radius = Mathf.Max(0.0000001f, scale.x);
                     if (sender.shapeType == ContactBase.ShapeType.Capsule)
                         sender.height = Mathf.Max(0.0000001f, scale.y);

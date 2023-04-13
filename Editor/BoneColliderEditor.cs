@@ -1,54 +1,39 @@
-﻿using System.Collections;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEditor;
 using UnityEditor.EditorTools;
 using UnityEngine;
 using VRC.Dynamics;
-using VRC.SDK3.Dynamics.Contact.Components;
 
 [EditorTool("Bone Tool",typeof(VRCPhysBoneColliderBase))]
 class BoneColliderEditor : EditorTool
 {
-    // Serialize this value to set a default value in the Inspector.
     [SerializeField]
     Texture2D m_ToolIcon;
 
     GUIContent m_IconContent;
 
+    List<VRCPhysBoneColliderBase> senders = new List<VRCPhysBoneColliderBase>();
+
     void OnEnable()
     {
-        m_IconContent = new GUIContent()
-        {
-            image = m_ToolIcon,
-            text = "Bone Tool",
-            tooltip = "Bone Tool"
-        };
+        m_IconContent = new GUIContent("Bone Tool", m_ToolIcon, "Bone Tool");
     }
 
-    public override GUIContent toolbarIcon
-    {
-        get { return m_IconContent; }
-    }
+    public override GUIContent toolbarIcon => m_IconContent;
 
     public override void OnToolGUI(EditorWindow window)
     {
-        if (Selection.transforms.Length == 0) return;
-
-
-        for (int i = 0; i < Selection.transforms.Length; i++)
+        foreach (var transform in Selection.transforms)
         {
-
-            VRCPhysBoneColliderBase[] senders = Selection.transforms[i].gameObject.GetComponents<VRCPhysBoneColliderBase>();
-            for (int j = 0; j < senders.Length; j++)
+            transform.gameObject.GetComponents(senders);
+            foreach (var sender in senders)
             {
-                VRCPhysBoneColliderBase sender = senders[j];
-
-                Transform senderTransform = sender.transform;
-                if (sender.rootTransform) senderTransform = sender.rootTransform;
+                Transform senderTransform = sender.rootTransform;
+                if (!senderTransform) senderTransform = sender.transform;
 
                 EditorGUI.BeginChangeCheck();
 
-                Vector3 position = (Vector3)(senderTransform.localToWorldMatrix * sender.position) + senderTransform.position;
+                Vector3 position = senderTransform.TransformPoint(sender.position);
                 Quaternion rotation = senderTransform.rotation * sender.rotation;
                 Vector2 scale = new Vector2(sender.radius, sender.height);
                 position = Handles.PositionHandle(position, rotation);
@@ -61,8 +46,8 @@ class BoneColliderEditor : EditorTool
                 if (EditorGUI.EndChangeCheck())
                 {
                     Undo.RecordObject(sender, "Move Contact");
-                    sender.position = (Vector3)(senderTransform.worldToLocalMatrix * (position - senderTransform.position));
-                    sender.rotation = (Quaternion.Inverse(senderTransform.rotation) * rotation).GetNormalized();
+                    sender.position = senderTransform.InverseTransformPoint(position);
+                    sender.rotation = (Quaternion.Inverse(senderTransform.rotation) * rotation).normalized;
                     if (sender.shapeType != VRCPhysBoneColliderBase.ShapeType.Plane)
                         sender.radius = Mathf.Max(0.0000001f, scale.x);
                     if (sender.shapeType == VRCPhysBoneColliderBase.ShapeType.Capsule)
