@@ -30,11 +30,8 @@ class PhysEndBoneEditor : EditorTool
             {
                 Transform senderTransform = sender.rootTransform;
                 if (!senderTransform) senderTransform = sender.transform;
-                while (true)
-                {
-                    if (senderTransform.childCount == 0) break;
+                while (senderTransform.childCount > 0)
                     senderTransform = senderTransform.GetChild(0);
-                }
                 EditorGUI.BeginChangeCheck();
 
                 Vector3 position = senderTransform.TransformPoint(sender.endpointPosition);
